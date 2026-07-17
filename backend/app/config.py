@@ -6,12 +6,7 @@ class Settings(BaseSettings):
     APP_VERSION: str
 
     SECRET_KEY: str
-
-    MYSQL_HOST: str
-    MYSQL_PORT: int
-    MYSQL_USER: str
-    MYSQL_PASSWORD: str
-    MYSQL_DATABASE: str
+    DATABASE_URL: str
     GROQ_API_KEY: str
 
     model_config = SettingsConfigDict(

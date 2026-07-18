@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import axios from 'axios';
+const API_URL = import.meta.env.VITE_API_URL;
 
 export default function Register() {
   const [formData, setFormData] = useState({
@@ -47,35 +48,32 @@ export default function Register() {
       role: "candidate" // Injects required backend literal token signature
     };
 
-    // 🚀 BULLETPROOF NETWORKING: Try 127.0.0.1 first, fall back to localhost if blocked
     try {
-      await axios.post('http://127.0.0.1:8000/auth/signup', payload, {
-        headers: { 'Content-Type': 'application/json' }
-      });
-      setSuccess(true);
-    } catch (firstErr) {
-      console.warn("Loopback IP failed, attempting Localhost fallback...", firstErr);
-      
-      try {
-        await axios.post('http://localhost:8000/auth/signup', payload, {
-          headers: { 'Content-Type': 'application/json' }
-        });
-        setSuccess(true);
-      } catch (err) {
-        console.error("Complete Connection Failure Details:", err);
-        
-        // Expose the absolute raw error so we aren't guessing anymore
-        if (err.response?.data?.detail) {
-          if (Array.isArray(err.response.data.detail)) {
-            setError(`Backend Schema Error: ${err.response.data.detail[0].msg}`);
-          } else {
-            setError(err.response.data.detail);
-          }
-        } else if (err.message) {
-          setError(`Network Error: ${err.message} (Check if FastAPI server terminal is active on port 8000)`);
-        } else {
-          setError("Server connection failure. Connection dropped completely.");
+      await axios.post(
+        `${API_URL}/auth/signup`,
+        payload,
+        {
+          headers: {
+            "Content-Type": "application/json",
+          },
         }
+      );
+
+      setSuccess(true);
+
+    } catch (err) {
+      console.error(err);
+
+      if (err.response?.data?.detail) {
+        if (Array.isArray(err.response.data.detail)) {
+          setError(err.response.data.detail[0].msg);
+        } else {
+          setError(err.response.data.detail);
+        }
+      } else if (err.message) {
+        setError(err.message);
+      } else {
+        setError("Server connection failure.");
       }
     } finally {
       setLoading(false);

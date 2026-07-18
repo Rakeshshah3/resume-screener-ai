@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import apiClient, { jobService, resumeService } from '../services/api';
 
 export default function RecruiterDashboard({ onLogout }) {
   const [jobForm, setJobForm] = useState({ 
@@ -40,12 +40,10 @@ export default function RecruiterDashboard({ onLogout }) {
 
   const fetchJobs = async () => {
     setLoadingJobs(true);
-    const token = localStorage.getItem('token');
-    const headers = { Authorization: `Bearer ${token}` };
 
     try {
-      const res = await axios.get('http://127.0.0.1:8000/jobs/', { headers });
-      const jobs = res.data || [];
+      const data = await jobService.getJobs();
+      const jobs = data || [];
       setJobsList(jobs);
       
       // Auto-select the first job node in the cluster if nothing is active yet
@@ -61,11 +59,9 @@ export default function RecruiterDashboard({ onLogout }) {
 
   const fetchRecommendations = async (jobId) => {
     setLoadingPipeline(true);
-    const token = localStorage.getItem('token');
-    const headers = { Authorization: `Bearer ${token}` };
 
     try {
-      const res = await axios.get(`http://127.0.0.1:8000/match/job/${jobId}`, { headers });
+      const res = await apiClient.get(`/match/job/${jobId}`);
       setCandidates(res.data || []);
     } catch (err) {
       console.error("Failed to pull score vectors for job:", jobId, err);
@@ -75,18 +71,12 @@ export default function RecruiterDashboard({ onLogout }) {
     }
   };
 
-  // 🚀 NEW FEATURE ACTION HANDLER: Patch pipeline selection metrics directly
+  // 🚀 ACTION HANDLER: Patch pipeline selection metrics directly via dynamic apiClient
   const handleUpdateStatus = async (matchId, newStatus) => {
-    const token = localStorage.getItem('token');
-    const headers = { Authorization: `Bearer ${token}` };
     setNotice({ type: '', msg: '' });
 
     try {
-      await axios.patch(
-        `http://127.0.0.1:8000/match/status/${matchId}?status_update=${newStatus}`,
-        {},
-        { headers }
-      );
+      await apiClient.patch(`/match/status/${matchId}?status_update=${newStatus}`, {});
       setNotice({ type: 'success', msg: `✨ Candidate status marked as ${newStatus} successfully.` });
       if (selectedJobId) {
         fetchRecommendations(selectedJobId); // Refresh live UI matrices metrics
@@ -106,8 +96,6 @@ export default function RecruiterDashboard({ onLogout }) {
     e.preventDefault();
     setNotice({ type: '', msg: '' });
     setActionLoading(true);
-
-    const token = localStorage.getItem('token');
     
     const payload = {
       title: jobForm.title,
@@ -117,18 +105,13 @@ export default function RecruiterDashboard({ onLogout }) {
     };
 
     try {
-      const res = await axios.post('http://127.0.0.1:8000/jobs/', payload, {
-        headers: { 
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`
-        }
-      });
+      const data = await jobService.createJob(payload);
       setNotice({ type: 'success', msg: '✨ Position deployed. Backend skills processor synced!' });
       setJobForm({ title: '', company: '', location: '', description: '' });
       
       await fetchJobs();
-      if (res.data?.id) {
-        setSelectedJobId(res.data.id);
+      if (data?.id) {
+        setSelectedJobId(data.id);
       }
     } catch (err) {
       setNotice({ 
@@ -141,11 +124,8 @@ export default function RecruiterDashboard({ onLogout }) {
   };
 
   const confirmDeleteJob = async (jobId) => {
-    const token = localStorage.getItem('token');
-    const headers = { Authorization: `Bearer ${token}` };
-
     try {
-      await axios.delete(`http://127.0.0.1:8000/jobs/${jobId}`, { headers });
+      await apiClient.delete(`/jobs/${jobId}`);
       setNotice({ type: 'success', msg: '🗑️ Vacancy scrubbed from system records successfully.' });
       
       if (selectedJobId === jobId) {
@@ -403,7 +383,6 @@ export default function RecruiterDashboard({ onLogout }) {
                             </span>
                           </td>
                           
-                          {/* 🚀 NEW: DYNAMIC RECRUITMENT PROCESSING STATUS COLUMN */}
                           <td className="p-4 text-center">
                             <span className={`inline-flex px-2 py-0.5 rounded text-[9px] font-black tracking-widest font-mono uppercase border select-none ${
                               c.status === 'Shortlisted' ? 'bg-emerald-950/40 border-emerald-500/40 text-emerald-400' :
@@ -414,7 +393,6 @@ export default function RecruiterDashboard({ onLogout }) {
                             </span>
                           </td>
                           
-                          {/* 🚀 NEW: RECRUITER ACTIONS CELL PANEL */}
                           <td className="p-4 text-right flex items-center justify-end gap-1.5" onClick={(e) => e.stopPropagation()}>
                             <button 
                               onClick={async () => {
@@ -425,13 +403,10 @@ export default function RecruiterDashboard({ onLogout }) {
                                 }
 
                                 try {
-                                  const token = localStorage.getItem('token');
-                                  const response = await axios.get(`http://127.0.0.1:8000/resume/download/${targetId}`, {
-                                    headers: { Authorization: `Bearer ${token}` },
-                                    responseType: 'blob' 
-                                  });
+                                  // Directly maps to binary download structure within resumeService
+                                  const blobData = await resumeService.downloadResume(targetId);
 
-                                  const fileBlobUrl = window.URL.createObjectURL(new Blob([response.data], { type: 'application/pdf' }));
+                                  const fileBlobUrl = window.URL.createObjectURL(new Blob([blobData], { type: 'application/pdf' }));
                                   const temporaryLink = document.createElement('a');
                                   temporaryLink.href = fileBlobUrl;
                                   temporaryLink.setAttribute('download', `Candidate_Resume_Node_${targetId}.pdf`);
@@ -450,7 +425,6 @@ export default function RecruiterDashboard({ onLogout }) {
                               Resume
                             </button>
 
-                            {/* Shortlist interactive trigger component */}
                             {c.status !== 'Shortlisted' && (
                               <button 
                                 onClick={() => handleUpdateStatus(c.id, "Shortlisted")}
@@ -460,7 +434,6 @@ export default function RecruiterDashboard({ onLogout }) {
                               </button>
                             )}
 
-                            {/* Reject interactive trigger component */}
                             {c.status !== 'Rejected' && (
                               <button 
                                 onClick={() => handleUpdateStatus(c.id, "Rejected")}

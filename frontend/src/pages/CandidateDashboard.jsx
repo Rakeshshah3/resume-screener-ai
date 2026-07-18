@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios'; 
+import apiClient, { jobService, resumeService } from '../services/api';
 
 export default function CandidateDashboard({ onLogout }) {
   const [file, setFile] = useState(null);
@@ -18,16 +18,14 @@ export default function CandidateDashboard({ onLogout }) {
 
   const fetchCandidateHubData = async () => {
     setLoadingData(true);
-    const token = localStorage.getItem('token');
-    const headers = { Authorization: `Bearer ${token}` };
 
     try {
-      // 1. Fetch system vacancies
-      const jobsRes = await axios.get('http://127.0.0.1:8000/jobs/', { headers });
-      setAvailableJobs(jobsRes.data || []);
+      // 1. Fetch system vacancies using the unified jobService
+      const jobsData = await jobService.getJobs();
+      setAvailableJobs(jobsData || []);
 
-      // 2. Pull user details for initial skill tracking checks
-      const userRes = await axios.get('http://127.0.0.1:8000/auth/me', { headers });
+      // 2. Pull user details for initial skill tracking checks via centralized apiClient wrapper
+      const userRes = await apiClient.get('/auth/me');
       if (userRes.data && userRes.data.skills) {
         const skillsArray = userRes.data.skills.split(',').map(s => s.trim().toLowerCase());
         setCandidateSkills(skillsArray);
@@ -35,8 +33,8 @@ export default function CandidateDashboard({ onLogout }) {
         setCandidateSkills([]);
       }
 
-      // 3. Fetch actual applications history and map target IDs straight to a flat Set layout
-      const historyRes = await axios.get('http://127.0.0.1:8000/match/candidate/history', { headers });
+      // 3. Fetch actual applications history using the dynamic apiClient routing token configuration
+      const historyRes = await apiClient.get('/match/candidate/history');
       const historyData = historyRes.data || [];
       setAppliedJobsRaw(historyData);
       
@@ -66,17 +64,10 @@ export default function CandidateDashboard({ onLogout }) {
 
     setNotice({ type: '', msg: '' });
     setUploading(true);
-    const token = localStorage.getItem('token');
-    const formData = new FormData();
-    formData.append('file', file);
 
     try {
-      await axios.post('http://127.0.0.1:8000/resume/upload', formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-          Authorization: `Bearer ${token}`
-        }
-      });
+      // Leverages the custom multipart/form-data handler compiled inside resumeService
+      await resumeService.uploadResume(file);
       setNotice({ type: 'success', msg: '🚀 Profile vector updated! System alignments computed.' });
       setFile(null);
       fetchCandidateHubData(); 
@@ -93,12 +84,9 @@ export default function CandidateDashboard({ onLogout }) {
   const handleApplyToJob = async (jobId) => {
     setApplyingId(jobId);
     setNotice({ type: '', msg: '' });
-    const token = localStorage.getItem('token');
     
     try {
-      const res = await axios.post(`http://127.0.0.1:8000/match/apply/${jobId}`, {}, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const res = await apiClient.post(`/match/apply/${jobId}`, {});
       
       setNotice({
         type: 'success',
@@ -202,7 +190,6 @@ export default function CandidateDashboard({ onLogout }) {
                     const isApplied = appliedJobIds.has(Number(job.id));
                     const rawApp = appliedJobsRaw.find(a => Number(a.job_id) === Number(job.id));
                     
-                    // 🚀 NEW STATE SELECTION MAPPING: Reads current hiring lifecycle token
                     const appStatus = rawApp ? rawApp.status : 'Applied';
                     
                     const matchPercent = isApplied && rawApp
@@ -257,7 +244,6 @@ export default function CandidateDashboard({ onLogout }) {
                           )}
                         </div>
 
-                        {/* 🚀 MUTATING RECRUITMENT STATUS SELECTION INTERACTION FRAME */}
                         <button
                           onClick={() => handleApplyToJob(job.id)}
                           disabled={applyingId !== null || isApplied}

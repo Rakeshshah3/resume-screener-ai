@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import apiClient, { jobService } from '../services/api';
 
 export default function CorporateOpenings() {
   const [jobs, setJobs] = useState([]);
@@ -10,12 +10,9 @@ export default function CorporateOpenings() {
   useEffect(() => {
     const fetchJobs = async () => {
       setLoading(true);
-      const token = localStorage.getItem('token');
       try {
-        const res = await axios.get('http://127.0.0.1:8000/jobs/', {
-          headers: { Authorization: `Bearer ${token}` }
-        });
-        setJobs(res.data || []);
+        const data = await jobService.getJobs();
+        setJobs(data || []);
       } catch (err) {
         console.error("Failed to fetch vacancies dashboard matrix:", err);
       } finally {
@@ -28,11 +25,8 @@ export default function CorporateOpenings() {
   // 🚀 INTERACTIVE ACTION HANDLER FOR THE TARGETED ROLE MATCH
   const handleApply = async (jobId) => {
     setApplyingId(jobId);
-    const token = localStorage.getItem('token');
     try {
-      const res = await axios.post(`http://127.0.0.1:8000/match/apply/${jobId}`, {}, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const res = await apiClient.post(`/match/apply/${jobId}`, {});
       
       alert(`✨ Application Successful!\nYour neural alignment score for this role is: ${res.data.match_score}%`);
       

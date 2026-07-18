@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import axios from 'axios';
 
+const API_URL = import.meta.env.VITE_API_URL;
+
 export default function AuthGateway({ onAuthSuccess }) {
   const [isLogin, setIsLogin] = useState(true);
   const [loading, setLoading] = useState(false);
@@ -60,7 +62,7 @@ export default function AuthGateway({ onAuthSuccess }) {
         params.append('username', formData.email);
         params.append('password', formData.password);
 
-        const response = await axios.post('http://127.0.0.1:8000/auth/login', params, {
+        const response = await axios.post(`${API_URL}/auth/login`, params, {
           headers: {
             'Content-Type': 'application/x-www-form-urlencoded'
           }
@@ -85,7 +87,7 @@ export default function AuthGateway({ onAuthSuccess }) {
           role: formData.role
         };
 
-        await axios.post('http://127.0.0.1:8000/auth/signup', payload, {
+        await axios.post(`${API_URL}/auth/signup`, payload, {
           headers: {
             'Content-Type': 'application/json'
           }

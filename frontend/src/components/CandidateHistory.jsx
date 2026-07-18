@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import apiClient from '../services/api';
 
 export default function CandidateHistory() {
   const [logs, setLogs] = useState([]);
@@ -8,12 +8,9 @@ export default function CandidateHistory() {
   useEffect(() => {
     const fetchHistoryLog = async () => {
       setLoading(true);
-      const token = localStorage.getItem('token');
       try {
-        // 🚀 FIXED: Pointing directly to the match resource route prefix tree
-        const res = await axios.get('http://127.0.0.1:8000/match/candidate/history', {
-          headers: { Authorization: `Bearer ${token}` }
-        });
+        // 🚀 FIXED: Routed dynamically via the centralized apiClient environment wrapper
+        const res = await apiClient.get('/match/candidate/history');
         setLogs(res.data || []);
       } catch (err) {
         console.error("Failed to query matrix matching logs repository:", err);
